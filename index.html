@@ -23,15 +23,17 @@
     }
     #reader {
       width: 100%;
+      max-width: 400px;
       margin-bottom: 1rem;
+      aspect-ratio: 1;
     }
   </style>
 </head>
 <body>
   <h1>🧺 Meine Vorratskammer</h1>
 
-  <div id="reader"></div>
   <button onclick="startScanner()">📷 Barcode scannen</button>
+  <div id="reader" style="display:none;"></div>
 
   <input type="text" id="name" placeholder="Produktname">
   <input type="text" id="menge" placeholder="Menge (z. B. 1 Packung)">
@@ -82,20 +84,37 @@
     }
 
     function startScanner() {
-      const html5QrCode = new Html5Qrcode("reader");
-      html5QrCode.start({ facingMode: "environment" }, {
-        fps: 10,
-        qrbox: 250
-      }, async barcode => {
-        html5QrCode.stop();
-        const produkt = await fetchProduktname(barcode);
-        if (produkt) {
-          document.getElementById('name').value = produkt;
-          document.getElementById('menge').value = '1 Stück';
+      const reader = document.getElementById('reader');
+      reader.style.display = 'block';
+
+      Html5Qrcode.getCameras().then(cameras => {
+        if (cameras && cameras.length) {
+          const html5QrCode = new Html5Qrcode("reader");
+          html5QrCode.start(
+            cameras[0].id,
+            {
+              fps: 10,
+              qrbox: 250
+            },
+            async barcode => {
+              html5QrCode.stop();
+              reader.style.display = 'none';
+              const produkt = await fetchProduktname(barcode);
+              if (produkt) {
+                document.getElementById('name').value = produkt;
+                document.getElementById('menge').value = '1 Stück';
+              } else {
+                alert('Produkt nicht gefunden. Bitte manuell eingeben.');
+              }
+            },
+            errorMessage => {
+              // ignorieren
+            }
+          ).catch(err => console.error('Scanner-Startfehler:', err));
         } else {
-          alert('Produkt nicht gefunden. Bitte manuell eingeben.');
+          alert("Keine Kamera gefunden oder Zugriff verweigert.");
         }
-      }).catch(err => console.error('Scanner-Fehler:', err));
+      }).catch(err => alert("Kamera-Zugriff fehlgeschlagen: " + err));
     }
 
     async function fetchProduktname(barcode) {
