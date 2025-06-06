@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vorratskammer</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
   <style>
     body {
       font-family: sans-serif;
@@ -20,10 +21,17 @@
       margin: 0.5rem 0;
       border-radius: 8px;
     }
+    #reader {
+      width: 100%;
+      margin-bottom: 1rem;
+    }
   </style>
 </head>
 <body>
   <h1>🧺 Meine Vorratskammer</h1>
+
+  <div id="reader"></div>
+  <button onclick="startScanner()">📷 Barcode scannen</button>
 
   <input type="text" id="name" placeholder="Produktname">
   <input type="text" id="menge" placeholder="Menge (z. B. 1 Packung)">
@@ -71,6 +79,36 @@
       produkte.splice(index, 1);
       localStorage.setItem('produkte', JSON.stringify(produkte));
       anzeigen();
+    }
+
+    function startScanner() {
+      const html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start({ facingMode: "environment" }, {
+        fps: 10,
+        qrbox: 250
+      }, async barcode => {
+        html5QrCode.stop();
+        const produkt = await fetchProduktname(barcode);
+        if (produkt) {
+          document.getElementById('name').value = produkt;
+          document.getElementById('menge').value = '1 Stück';
+        } else {
+          alert('Produkt nicht gefunden. Bitte manuell eingeben.');
+        }
+      }).catch(err => console.error('Scanner-Fehler:', err));
+    }
+
+    async function fetchProduktname(barcode) {
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+        const data = await res.json();
+        if (data.status === 1) {
+          return data.product.product_name || 'Unbenanntes Produkt';
+        }
+      } catch (e) {
+        console.error('API-Fehler:', e);
+      }
+      return null;
     }
 
     anzeigen();
