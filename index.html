@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Vorratskammer</title>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
   <style>
@@ -10,7 +10,8 @@
       font-family: sans-serif;
       margin: 1rem;
     }
-    input, button {
+    input,
+    button {
       margin: 0.5rem 0;
       padding: 0.5rem;
       width: 100%;
@@ -26,18 +27,19 @@
       max-width: 400px;
       margin-bottom: 1rem;
       aspect-ratio: 1;
+      display: none;
     }
   </style>
 </head>
 <body>
   <h1>🧺 Meine Vorratskammer</h1>
 
-  <button onclick="startScanner()">📷 Barcode scannen</button>
-  <div id="reader" style="display:none;"></div>
+  <button id="scan-btn">📷 Barcode scannen</button>
+  <div id="reader"></div>
 
-  <input type="text" id="name" placeholder="Produktname">
-  <input type="text" id="menge" placeholder="Menge (z. B. 1 Packung)">
-  <input type="date" id="haltbarkeit">
+  <input type="text" id="name" placeholder="Produktname" />
+  <input type="text" id="menge" placeholder="Menge (z. B. 1 Packung)" />
+  <input type="date" id="haltbarkeit" />
   <button onclick="hinzufuegen()">➕ Produkt hinzufügen</button>
 
   <h2>📋 Lagerbestand</h2>
@@ -83,43 +85,11 @@
       anzeigen();
     }
 
-    function startScanner() {
-      const reader = document.getElementById('reader');
-      reader.style.display = 'block';
-
-      Html5Qrcode.getCameras().then(cameras => {
-        if (cameras && cameras.length) {
-          const html5QrCode = new Html5Qrcode("reader");
-          html5QrCode.start(
-            cameras[0].id,
-            {
-              fps: 10,
-              qrbox: 250
-            },
-            async barcode => {
-              html5QrCode.stop();
-              reader.style.display = 'none';
-              const produkt = await fetchProduktname(barcode);
-              if (produkt) {
-                document.getElementById('name').value = produkt;
-                document.getElementById('menge').value = '1 Stück';
-              } else {
-                alert('Produkt nicht gefunden. Bitte manuell eingeben.');
-              }
-            },
-            errorMessage => {
-              // ignorieren
-            }
-          ).catch(err => console.error('Scanner-Startfehler:', err));
-        } else {
-          alert("Keine Kamera gefunden oder Zugriff verweigert.");
-        }
-      }).catch(err => alert("Kamera-Zugriff fehlgeschlagen: " + err));
-    }
-
     async function fetchProduktname(barcode) {
       try {
-        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+        const res = await fetch(
+          `https://world.openfoodfacts.org/api/v0/product/${barcode}.json`
+        );
         const data = await res.json();
         if (data.status === 1) {
           return data.product.product_name || 'Unbenanntes Produkt';
@@ -129,6 +99,32 @@
       }
       return null;
     }
+
+    function startScanner() {
+      const reader = document.getElementById('reader');
+      reader.style.display = 'block';
+
+      const scanner = new Html5QrcodeScanner(
+        "reader",
+        { fps: 10, qrbox: { width: 300, height: 300 } },
+        false
+      );
+
+      scanner.render(async (barcode, result) => {
+        scanner.clear(); // Scanner stoppen und Kamera freigeben
+        reader.style.display = 'none';
+
+        const produkt = await fetchProduktname(barcode);
+        if (produkt) {
+          document.getElementById('name').value = produkt;
+          document.getElementById('menge').value = '1 Stück';
+        } else {
+          alert('Produkt nicht gefunden. Bitte manuell eingeben.');
+        }
+      });
+    }
+
+    document.getElementById('scan-btn').addEventListener('click', startScanner);
 
     anzeigen();
   </script>
