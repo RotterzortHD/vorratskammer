@@ -103,39 +103,37 @@
 
         qrCodeScanner = new Html5Qrcode("reader");
 
-        await qrCodeScanner.start(
-          { deviceId: { exact: backCamera.id } },
-          {
-            fps: 10,
-            qrbox: { width: 300, height: 100 },
-            formatsToSupport: [
-              Html5QrcodeSupportedFormats.EAN_13,
-              Html5QrcodeSupportedFormats.UPC_A,
-              Html5QrcodeSupportedFormats.CODE_128
-            ]
-          },
-          async (barcode) => {
-            console.log("Gefundener Code:", barcode);
-            await qrCodeScanner.stop();
-            reader.style.display = 'none';
+        async (barcode) => {
+          console.log("Gefundener Code:", barcode);
 
-            const produkt = await fetchProduktname(barcode);
-            if (produkt) {
-              document.getElementById('name').value = produkt;
-              document.getElementById('menge').value = '1 Stück';
-            } else {
-              alert("Produkt nicht gefunden. Bitte manuell eingeben.");
-            }
-          },
+          try {
+            await qrCodeScanner.stop();
+            await qrCodeScanner.clear();
+          } catch (e) {
+            console.warn("Fehler beim Stoppen des Scanners:", e);
+          }
+
+          reader.style.display = 'none';
+          qrCodeScanner = null; // Wichtig: Scanner-Instanz zurücksetzen
+
+          const produkt = await fetchProduktname(barcode);
+          if (produkt) {
+            document.getElementById('name').value = produkt;
+            document.getElementById('menge').value = '1 Stück';
+          } else {
+            alert("Produkt nicht gefunden. Bitte manuell eingeben.");
+          }
+        },
           (errorMessage) => {
             // Scan-Fehler ignorieren oder hier Debug-Ausgaben machen
             // console.warn("Scan-Fehler:", errorMessage);
           }
         );
       } catch (err) {
-        reader.style.display = 'none';
-        alert("Kamera-Zugriff fehlgeschlagen:\n" + err.message);
-      }
+          reader.style.display = 'none';
+          qrCodeScanner = null; // auch im Fehlerfall zurücksetzen
+          alert("Kamera-Zugriff fehlgeschlagen:\n" + err.message);
+        }    
     }
 
     async function fetchProduktname(barcode) {
