@@ -43,12 +43,13 @@
   <h2>📋 Lagerbestand</h2>
   <div id="liste"></div>
 
-  <!-- html5-qrcode Bibliothek -->
+  <!-- html5-qrcode Bibliothek (richtiges CDN!) -->
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
   <script>
     let produkte = JSON.parse(localStorage.getItem('produkte')) || [];
     let qrCodeScanner = null;
+    const { Html5QrcodeSupportedFormats } = window;
 
     function anzeigen() {
       const liste = document.getElementById('liste');
@@ -97,7 +98,7 @@
 
         console.log("Gefundene Kameras:", cameras);
 
-        // Rückkamera wählen: Kamera, deren Label nicht "front" enthält
+        // Rückkamera wählen (Kameras ohne "front" im Label)
         const backCamera = cameras.find(c => !c.label.toLowerCase().includes('front')) || cameras[0];
 
         qrCodeScanner = new Html5Qrcode("reader");
@@ -110,31 +111,44 @@
             formatsToSupport: [
               Html5QrcodeSupportedFormats.EAN_13,
               Html5QrcodeSupportedFormats.UPC_A,
-              Html5QrcodeSupportedFormats.UPC_E,
+              Html5QrcodeSupportedFormats.CODE_128
             ]
           },
-          (decodedText, decodedResult) => {
-            // Barcode erkannt, Scanner stoppen
-            qrCodeScanner.stop().then(() => {
-              reader.style.display = 'none';
-            }).catch(err => {
-              console.error("Fehler beim Stoppen des Scanners:", err);
-            });
+          async (barcode) => {
+            console.log("Gefundener Code:", barcode);
+            await qrCodeScanner.stop();
+            reader.style.display = 'none';
 
-            console.log("Barcode erkannt:", decodedText);
-            // Hier könntest du eine API abfragen, um den Produktnamen zum Barcode zu bekommen
-            // Für Demo: Einfach den Barcode als Produktname übernehmen
-            document.getElementById('name').value = decodedText;
-            document.getElementById('menge').focus();
+            const produkt = await fetchProduktname(barcode);
+            if (produkt) {
+              document.getElementById('name').value = produkt;
+              document.getElementById('menge').value = '1 Stück';
+            } else {
+              alert("Produkt nicht gefunden. Bitte manuell eingeben.");
+            }
           },
           (errorMessage) => {
-            // Optionale Fehlerbehandlung während des Scans
+            // Scan-Fehler ignorieren oder hier Debug-Ausgaben machen
             // console.warn("Scan-Fehler:", errorMessage);
           }
         );
-      } catch (e) {
-        alert(e.message);
+      } catch (err) {
+        reader.style.display = 'none';
+        alert("Kamera-Zugriff fehlgeschlagen:\n" + err.message);
       }
+    }
+
+    async function fetchProduktname(barcode) {
+      try {
+        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+        const data = await res.json();
+        if (data.status === 1) {
+          return data.product.product_name || "Unbenanntes Produkt";
+        }
+      } catch (e) {
+        console.error("API-Fehler:", e);
+      }
+      return null;
     }
 
     anzeigen();
