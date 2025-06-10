@@ -13,6 +13,7 @@
       margin: 0.5rem 0;
       padding: 0.5rem;
       width: 100%;
+      box-sizing: border-box;
     }
     .produkt {
       border: 1px solid #ccc;
@@ -49,6 +50,7 @@
   <script>
     let produkte = JSON.parse(localStorage.getItem('produkte')) || [];
     let qrCodeScanner = null;
+    let scanning = false;
 
     function anzeigen() {
       const liste = document.getElementById('liste');
@@ -71,7 +73,10 @@
       const menge = document.getElementById('menge').value.trim();
       const haltbarkeit = document.getElementById('haltbarkeit').value;
 
-      if (!name || !menge) return alert('Bitte Name und Menge eingeben.');
+      if (!name || !menge) {
+        alert('Bitte Name und Menge eingeben.');
+        return;
+      }
 
       produkte.push({ name, menge, haltbarkeit });
       localStorage.setItem('produkte', JSON.stringify(produkte));
@@ -88,24 +93,33 @@
     }
 
     async function startScanner() {
+      if (scanning) return; // Scanner läuft schon
+
       const reader = document.getElementById('reader');
       reader.style.display = 'block';
 
       try {
         const cameras = await Html5Qrcode.getCameras();
-        if (!cameras.length) throw new Error("Keine Kamera gefunden");
+        if (!cameras || cameras.length === 0) throw new Error("Keine Kamera gefunden");
 
-        const backCamera = cameras.find(c => c.label.toLowerCase().includes('back')) || cameras[0];
+        const cameraId = cameras[0].id; // Default erste Kamera nehmen
+
         qrCodeScanner = new Html5Qrcode("reader");
+        scanning = true;
 
         await qrCodeScanner.start(
-          { deviceId: { exact: backCamera.id } },
+          { deviceId: { exact: cameraId } },
           {
             fps: 10,
             qrbox: { width: 250, height: 250 }
           },
           async (barcode) => {
-            await qrCodeScanner.stop();
+            try {
+              await qrCodeScanner.stop();
+            } catch (e) {
+              console.warn("Fehler beim Stoppen des Scanners:", e);
+            }
+            scanning = false;
             reader.style.display = 'none';
 
             const produkt = await fetchProduktname(barcode);
@@ -116,11 +130,12 @@
               alert("Produkt nicht gefunden. Bitte manuell eingeben.");
             }
           },
-          error => {
-            // Ignoriere Scan-Fehler stillschweigend
+          (error) => {
+            // Scan-Fehler ignorieren, z.B. kein Barcode im Bild
           }
         );
       } catch (err) {
+        scanning = false;
         reader.style.display = 'none';
         alert("Kamera-Zugriff fehlgeschlagen:\n" + err.message);
       }
@@ -129,6 +144,7 @@
     async function fetchProduktname(barcode) {
       try {
         const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+        if (!res.ok) throw new Error('Netzwerkantwort war nicht ok');
         const data = await res.json();
         if (data.status === 1) {
           return data.product.product_name || "Unbenanntes Produkt";
