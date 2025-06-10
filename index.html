@@ -4,7 +4,6 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Vorratskammer</title>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
   <style>
     body {
       font-family: sans-serif;
@@ -43,6 +42,9 @@
 
   <h2>📋 Lagerbestand</h2>
   <div id="liste"></div>
+
+  <!-- html5-qrcode Bibliothek -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
 
   <script>
     let produkte = JSON.parse(localStorage.getItem('produkte')) || [];
@@ -115,7 +117,7 @@
             }
           },
           error => {
-            // QR-Code nicht erkennbar – ignoriere stillschweigend
+            // Ignoriere Scan-Fehler stillschweigend
           }
         );
       } catch (err) {
