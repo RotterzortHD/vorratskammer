@@ -33,129 +33,136 @@
 <body>
   <h1>🧺 Meine Vorratskammer</h1>
 
-  <button onclick="startScanner()">📷 Barcode scannen</button>
+  <button id="scanBtn">📷 Barcode scannen</button>
   <div id="reader"></div>
 
   <input type="text" id="name" placeholder="Produktname" />
   <input type="text" id="menge" placeholder="Menge (z. B. 1 Packung)" />
   <input type="date" id="haltbarkeit" />
-  <button onclick="hinzufuegen()">➕ Produkt hinzufügen</button>
+  <button id="addBtn">➕ Produkt hinzufügen</button>
 
   <h2>📋 Lagerbestand</h2>
   <div id="liste"></div>
 
-  <!-- html5-qrcode Bibliothek -->
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+  <!-- html5-qrcode Bibliothek von jsdelivr -->
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
 
   <script>
-    let produkte = JSON.parse(localStorage.getItem('produkte')) || [];
-    let qrCodeScanner = null;
-    let scanning = false;
+    window.addEventListener('DOMContentLoaded', () => {
+      let produkte = JSON.parse(localStorage.getItem('produkte')) || [];
+      let qrCodeScanner = null;
+      let scanning = false;
 
-    function anzeigen() {
       const liste = document.getElementById('liste');
-      liste.innerHTML = '';
-      produkte.forEach((p, index) => {
-        const div = document.createElement('div');
-        div.className = 'produkt';
-        div.innerHTML = `
-          <strong>${p.name}</strong><br>
-          Menge: ${p.menge}<br>
-          Haltbar bis: ${p.haltbarkeit || 'unbekannt'}<br>
-          <button onclick="loeschen(${index})">🗑️ Entfernen</button>
-        `;
-        liste.appendChild(div);
-      });
-    }
-
-    function hinzufuegen() {
-      const name = document.getElementById('name').value.trim();
-      const menge = document.getElementById('menge').value.trim();
-      const haltbarkeit = document.getElementById('haltbarkeit').value;
-
-      if (!name || !menge) {
-        alert('Bitte Name und Menge eingeben.');
-        return;
-      }
-
-      produkte.push({ name, menge, haltbarkeit });
-      localStorage.setItem('produkte', JSON.stringify(produkte));
-      anzeigen();
-      document.getElementById('name').value = '';
-      document.getElementById('menge').value = '';
-      document.getElementById('haltbarkeit').value = '';
-    }
-
-    function loeschen(index) {
-      produkte.splice(index, 1);
-      localStorage.setItem('produkte', JSON.stringify(produkte));
-      anzeigen();
-    }
-
-    async function startScanner() {
-      if (scanning) return; // Scanner läuft schon
-
       const reader = document.getElementById('reader');
-      reader.style.display = 'block';
+      const scanBtn = document.getElementById('scanBtn');
+      const addBtn = document.getElementById('addBtn');
 
-      try {
-        const cameras = await Html5Qrcode.getCameras();
-        if (!cameras || cameras.length === 0) throw new Error("Keine Kamera gefunden");
-
-        const cameraId = cameras[0].id; // Default erste Kamera nehmen
-
-        qrCodeScanner = new Html5Qrcode("reader");
-        scanning = true;
-
-        await qrCodeScanner.start(
-          { deviceId: { exact: cameraId } },
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 }
-          },
-          async (barcode) => {
-            try {
-              await qrCodeScanner.stop();
-            } catch (e) {
-              console.warn("Fehler beim Stoppen des Scanners:", e);
-            }
-            scanning = false;
-            reader.style.display = 'none';
-
-            const produkt = await fetchProduktname(barcode);
-            if (produkt) {
-              document.getElementById('name').value = produkt;
-              document.getElementById('menge').value = '1 Stück';
-            } else {
-              alert("Produkt nicht gefunden. Bitte manuell eingeben.");
-            }
-          },
-          (error) => {
-            // Scan-Fehler ignorieren, z.B. kein Barcode im Bild
-          }
-        );
-      } catch (err) {
-        scanning = false;
-        reader.style.display = 'none';
-        alert("Kamera-Zugriff fehlgeschlagen:\n" + err.message);
+      function anzeigen() {
+        liste.innerHTML = '';
+        produkte.forEach((p, index) => {
+          const div = document.createElement('div');
+          div.className = 'produkt';
+          div.innerHTML = `
+            <strong>${p.name}</strong><br>
+            Menge: ${p.menge}<br>
+            Haltbar bis: ${p.haltbarkeit || 'unbekannt'}<br>
+            <button onclick="loeschen(${index})">🗑️ Entfernen</button>
+          `;
+          liste.appendChild(div);
+        });
       }
-    }
 
-    async function fetchProduktname(barcode) {
-      try {
-        const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
-        if (!res.ok) throw new Error('Netzwerkantwort war nicht ok');
-        const data = await res.json();
-        if (data.status === 1) {
-          return data.product.product_name || "Unbenanntes Produkt";
+      function hinzufuegen() {
+        const name = document.getElementById('name').value.trim();
+        const menge = document.getElementById('menge').value.trim();
+        const haltbarkeit = document.getElementById('haltbarkeit').value;
+
+        if (!name || !menge) {
+          alert('Bitte Name und Menge eingeben.');
+          return;
         }
-      } catch (e) {
-        console.error("API-Fehler:", e);
-      }
-      return null;
-    }
 
-    anzeigen();
+        produkte.push({ name, menge, haltbarkeit });
+        localStorage.setItem('produkte', JSON.stringify(produkte));
+        anzeigen();
+        document.getElementById('name').value = '';
+        document.getElementById('menge').value = '';
+        document.getElementById('haltbarkeit').value = '';
+      }
+
+      window.loeschen = function(index) {
+        produkte.splice(index, 1);
+        localStorage.setItem('produkte', JSON.stringify(produkte));
+        anzeigen();
+      }
+
+      async function startScanner() {
+        if (scanning) return;
+
+        try {
+          const cameras = await Html5Qrcode.getCameras();
+          if (!cameras || cameras.length === 0) throw new Error("Keine Kamera gefunden");
+
+          const cameraId = cameras[0].id;
+
+          qrCodeScanner = new Html5Qrcode("reader");
+          scanning = true;
+          reader.style.display = 'block';
+
+          await qrCodeScanner.start(
+            { deviceId: { exact: cameraId } },
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 250 }
+            },
+            async (barcode) => {
+              try {
+                await qrCodeScanner.stop();
+              } catch (e) {
+                console.warn("Fehler beim Stoppen des Scanners:", e);
+              }
+              scanning = false;
+              reader.style.display = 'none';
+
+              const produkt = await fetchProduktname(barcode);
+              if (produkt) {
+                document.getElementById('name').value = produkt;
+                document.getElementById('menge').value = '1 Stück';
+              } else {
+                alert("Produkt nicht gefunden. Bitte manuell eingeben.");
+              }
+            },
+            (error) => {
+              // Scan-Fehler ignorieren
+            }
+          );
+        } catch (err) {
+          scanning = false;
+          reader.style.display = 'none';
+          alert("Kamera-Zugriff fehlgeschlagen:\n" + err.message);
+        }
+      }
+
+      async function fetchProduktname(barcode) {
+        try {
+          const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+          if (!res.ok) throw new Error('Netzwerkantwort war nicht ok');
+          const data = await res.json();
+          if (data.status === 1) {
+            return data.product.product_name || "Unbenanntes Produkt";
+          }
+        } catch (e) {
+          console.error("API-Fehler:", e);
+        }
+        return null;
+      }
+
+      scanBtn.addEventListener('click', startScanner);
+      addBtn.addEventListener('click', hinzufuegen);
+
+      anzeigen();
+    });
   </script>
 </body>
 </html>
