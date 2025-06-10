@@ -8,24 +8,53 @@
     body {
       font-family: sans-serif;
       margin: 1rem;
+      max-width: 600px;
     }
-    input, button {
+    input, button, select {
       margin: 0.5rem 0;
       padding: 0.5rem;
       width: 100%;
+      box-sizing: border-box;
     }
     .produkt {
       border: 1px solid #ccc;
       padding: 0.5rem;
       margin: 0.5rem 0;
       border-radius: 8px;
+      position: relative;
+    }
+    .abgelaufen {
+      background-color: #fdd;
+      border-color: #f00;
+    }
+    .bald-abgelaufen {
+      background-color: #ffe8b3;
+      border-color: #ff9900;
+    }
+    .frisch {
+      background-color: #e6ffe6;
+      border-color: #33cc33;
     }
     #reader {
       width: 100%;
-      max-width: 400px;
+      max-width: 300px;
       margin-bottom: 1rem;
-      aspect-ratio: 1;
+      aspect-ratio: 4 / 3;
       display: none;
+      border: 2px solid #333;
+      border-radius: 8px;
+    }
+    .btn-klein {
+      font-size: 0.9rem;
+      padding: 0.3rem 0.5rem;
+      margin-left: 0.3rem;
+    }
+    .edit-felder input {
+      width: 45%;
+      margin-right: 5%;
+    }
+    .edit-felder {
+      margin-top: 0.5rem;
     }
   </style>
 </head>
@@ -35,6 +64,8 @@
   <button onclick="startScanner()">📷 Barcode scannen</button>
   <div id="reader"></div>
 
+  <input type="text" id="suchfeld" placeholder="🔍 Produkt suchen..." oninput="anzeigen()" />
+
   <input type="text" id="name" placeholder="Produktname" />
   <input type="text" id="menge" placeholder="Menge (z. B. 1 Packung)" />
   <input type="date" id="haltbarkeit" />
@@ -43,25 +74,60 @@
   <h2>📋 Lagerbestand</h2>
   <div id="liste"></div>
 
-  <!-- Bibliothek ganz am Ende laden -->
+  <!-- Bibliothek laden -->
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
   <script>
     let produkte = JSON.parse(localStorage.getItem('produkte')) || [];
     let qrCodeScanner = null;
 
+    function saveProdukte() {
+      localStorage.setItem('produkte', JSON.stringify(produkte));
+    }
+
+    function datumStatus(haltbarkeit) {
+      if (!haltbarkeit) return 'frisch';
+      const heute = new Date();
+      const haltbDatum = new Date(haltbarkeit);
+      const diff = (haltbDatum - heute) / (1000*60*60*24);
+      if (diff < 0) return 'abgelaufen';
+      if (diff <= 7) return 'bald-abgelaufen';
+      return 'frisch';
+    }
+
     window.anzeigen = function() {
       const liste = document.getElementById('liste');
+      const filter = document.getElementById('suchfeld').value.toLowerCase();
       liste.innerHTML = '';
+
       produkte.forEach((p, index) => {
+        if (!p.name.toLowerCase().includes(filter)) return;
+
+        const status = datumStatus(p.haltbarkeit);
         const div = document.createElement('div');
-        div.className = 'produkt';
-        div.innerHTML = `
-          <strong>${p.name}</strong><br>
-          Menge: ${p.menge}<br>
-          Haltbar bis: ${p.haltbarkeit || 'unbekannt'}<br>
-          <button onclick="loeschen(${index})">🗑️ Entfernen</button>
-        `;
+        div.className = `produkt ${status}`;
+
+        // Wenn Produkt gerade editiert wird
+        if (p.edit) {
+          div.innerHTML = `
+            <div class="edit-felder">
+              <input type="text" id="edit-name-${index}" value="${p.name}" />
+              <input type="text" id="edit-menge-${index}" value="${p.menge}" />
+              <input type="date" id="edit-haltbarkeit-${index}" value="${p.haltbarkeit || ''}" />
+            </div>
+            <button class="btn-klein" onclick="speichern(${index})">💾 Speichern</button>
+            <button class="btn-klein" onclick="abbrechen(${index})">❌ Abbrechen</button>
+          `;
+        } else {
+          div.innerHTML = `
+            <strong>${p.name}</strong><br>
+            Menge: ${p.menge}<br>
+            Haltbar bis: ${p.haltbarkeit || 'unbekannt'}<br>
+            <button class="btn-klein" onclick="bearbeiten(${index})">✏️ Bearbeiten</button>
+            <button class="btn-klein" onclick="loeschen(${index})">🗑️ Entfernen</button>
+          `;
+        }
+
         liste.appendChild(div);
       });
     }
@@ -71,19 +137,85 @@
       const menge = document.getElementById('menge').value.trim();
       const haltbarkeit = document.getElementById('haltbarkeit').value;
 
-      if (!name || !menge) return alert('Bitte Name und Menge eingeben.');
+      if (!name || !menge) {
+        alert('Bitte Name und Menge eingeben.');
+        return;
+      }
 
-      produkte.push({ name, menge, haltbarkeit });
-      localStorage.setItem('produkte', JSON.stringify(produkte));
+      // Prüfen ob Produkt schon existiert (Name ignoriert Groß-/Kleinschreibung)
+      const existierenderIndex = produkte.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
+      if (existierenderIndex !== -1) {
+        // Menge addieren
+        produkte[existierenderIndex].menge = addMengen(produkte[existierenderIndex].menge, menge);
+        // Haltbarkeit aktualisieren, wenn neuer Wert gesetzt und früher
+        if (haltbarkeit) {
+          if (!produkte[existierenderIndex].haltbarkeit || new Date(haltbarkeit) < new Date(produkte[existierenderIndex].haltbarkeit)) {
+            produkte[existierenderIndex].haltbarkeit = haltbarkeit;
+          }
+        }
+      } else {
+        produkte.push({ name, menge, haltbarkeit });
+      }
+
+      saveProdukte();
       anzeigen();
+
+      // Felder zurücksetzen
       document.getElementById('name').value = '';
       document.getElementById('menge').value = '';
       document.getElementById('haltbarkeit').value = '';
     }
 
+    // Hilfsfunktion um Mengen zusammenzurechnen (einfache Implementierung)
+    function addMengen(mengeAlt, mengeNeu) {
+      // Wenn beide Mengen wie "1 Stück", "2 Packungen" sind, werden nur die Zahlen addiert, Einheit bleibt erhalten
+      const regex = /^(\d+)\s*(.*)$/;
+      const altMatch = mengeAlt.match(regex);
+      const neuMatch = mengeNeu.match(regex);
+      if (altMatch && neuMatch && altMatch[2] === neuMatch[2]) {
+        const sum = parseInt(altMatch[1]) + parseInt(neuMatch[1]);
+        return sum + ' ' + altMatch[2];
+      }
+      // Wenn nicht parsebar, einfach die neue Menge anfügen, getrennt mit Komma
+      return mengeAlt + ', ' + mengeNeu;
+    }
+
     window.loeschen = function(index) {
-      produkte.splice(index, 1);
-      localStorage.setItem('produkte', JSON.stringify(produkte));
+      if (confirm(`Produkt "${produkte[index].name}" wirklich entfernen?`)) {
+        produkte.splice(index, 1);
+        saveProdukte();
+        anzeigen();
+      }
+    }
+
+    window.bearbeiten = function(index) {
+      produkte[index].edit = true;
+      anzeigen();
+    }
+
+    window.speichern = function(index) {
+      const nameNeu = document.getElementById(`edit-name-${index}`).value.trim();
+      const mengeNeu = document.getElementById(`edit-menge-${index}`).value.trim();
+      const haltbNeu = document.getElementById(`edit-haltbarkeit-${index}`).value;
+
+      if (!nameNeu || !mengeNeu) {
+        alert('Name und Menge dürfen nicht leer sein.');
+        return;
+      }
+
+      produkte[index] = {
+        name: nameNeu,
+        menge: mengeNeu,
+        haltbarkeit: haltbNeu,
+      };
+
+      delete produkte[index].edit;
+      saveProdukte();
+      anzeigen();
+    }
+
+    window.abbrechen = function(index) {
+      delete produkte[index].edit;
       anzeigen();
     }
 
@@ -95,9 +227,16 @@
         const cameras = await Html5Qrcode.getCameras();
         if (!cameras.length) throw new Error("Keine Kamera gefunden");
 
-        // Rückkamera wählen (Kameras ohne "front" im Namen bevorzugen)
+        // Rückkamera bevorzugen (kein "front" im Label)
         const backCamera = cameras.find(c => !c.label.toLowerCase().includes('front')) || cameras[0];
 
+        if (qrCodeScanner) {
+          try {
+            await qrCodeScanner.stop();
+            await qrCodeScanner.clear();
+          } catch {}
+          qrCodeScanner = null;
+        }
         qrCodeScanner = new Html5Qrcode("reader");
 
         await qrCodeScanner.start(
@@ -112,32 +251,41 @@
             ]
           },
           async (barcode) => {
-            console.log("Gefundener Code:", barcode);
-
+            console.log("Barcode gescannt:", barcode);
             try {
               await qrCodeScanner.stop();
               await qrCodeScanner.clear();
-            } catch (e) {
-              console.warn("Fehler beim Stoppen des Scanners:", e);
-            }
+            } catch {}
             reader.style.display = 'none';
             qrCodeScanner = null;
 
+            // Produktname aus OpenFoodFacts laden
             const produkt = await fetchProduktname(barcode);
             if (produkt) {
+              // Prüfen, ob Produkt schon in der Liste ist
+              const indexExist = produkte.findIndex(p => p.name.toLowerCase() === produkt.toLowerCase());
+              if (indexExist !== -1) {
+                // Menge erhöhen um 1 Stück
+                produkte[indexExist].menge = addMengen(produkte[indexExist].menge, '1 Stück');
+              } else {
+                produkte.push({ name: produkt, menge: '1 Stück', haltbarkeit: '' });
+              }
+              saveProdukte();
+              anzeigen();
+              // Eingabefelder auffüllen für den Fall, dass man noch etwas ändern will
               document.getElementById('name').value = produkt;
               document.getElementById('menge').value = '1 Stück';
+              document.getElementById('haltbarkeit').value = '';
             } else {
               alert("Produkt nicht gefunden. Bitte manuell eingeben.");
             }
           },
-          (errorMessage) => {
-            // Fehler während des Scannens ignorieren
+          (error) => {
+            // Scanfehler ignorieren, kein console.log um nicht zu spammen
           }
         );
       } catch (err) {
         reader.style.display = 'none';
-        qrCodeScanner = null;
         alert("Kamera-Zugriff fehlgeschlagen:\n" + err.message);
       }
     }
@@ -155,6 +303,7 @@
       return null;
     }
 
+    // Beim Laden anzeigen
     anzeigen();
   </script>
 </body>
