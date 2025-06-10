@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Vorratskammer</title>
   <style>
     body {
@@ -39,10 +39,6 @@
       color: red;
       font-weight: bold;
     }
-    #suchfeld {
-      margin: 1rem 0;
-      padding: 0.5rem;
-    }
   </style>
 </head>
 <body>
@@ -50,17 +46,15 @@
   <button onclick="startScanner()">📷 Barcode scannen</button>
   <div id="reader"></div>
 
-  <input type="text" id="name" placeholder="Produktname">
-  <input type="text" id="menge" placeholder="Menge (z. B. 1 Packung)">
-  <input type="date" id="haltbarkeit">
+  <input type="text" id="name" placeholder="Produktname" />
+  <input type="text" id="menge" placeholder="Menge (z. B. 1 Packung)" />
+  <input type="date" id="haltbarkeit" />
   <button onclick="hinzufuegen()">➕ Produkt hinzufügen</button>
-
-  <input type="text" id="suchfeld" placeholder="🔍 Suchen..." oninput="filtern()">
 
   <h2>📋 Lagerbestand</h2>
   <div id="liste"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
   <script>
     let produkte = JSON.parse(localStorage.getItem('produkte')) || [];
     let qrCodeScanner = null;
@@ -69,20 +63,18 @@
       localStorage.setItem('produkte', JSON.stringify(produkte));
     }
 
-    function anzeigen(gefiltert = null) {
+    function anzeigen() {
       const liste = document.getElementById('liste');
       liste.innerHTML = '';
       const heute = new Date().toISOString().split('T')[0];
 
-      const anzuzeigen = gefiltert || produkte;
-
-      anzuzeigen.sort((a, b) => {
+      produkte.sort((a, b) => {
         if (!a.haltbarkeit) return 1;
         if (!b.haltbarkeit) return -1;
         return a.haltbarkeit.localeCompare(b.haltbarkeit);
       });
 
-      anzuzeigen.forEach((p, index) => {
+      produkte.forEach((p, index) => {
         const div = document.createElement('div');
         div.className = 'produkt';
         if (p.haltbarkeit && p.haltbarkeit < heute) {
@@ -98,15 +90,6 @@
         `;
         liste.appendChild(div);
       });
-    }
-
-    function filtern() {
-      const begriff = document.getElementById('suchfeld').value.toLowerCase();
-      const gefiltert = produkte.filter(p =>
-        p.name.toLowerCase().includes(begriff) ||
-        p.menge.toLowerCase().includes(begriff)
-      );
-      anzeigen(gefiltert);
     }
 
     function hinzufuegen() {
@@ -159,15 +142,11 @@
       reader.style.display = 'block';
 
       try {
-        const config = {
-          fps: 30,
-          qrbox: { width: 350, height: 200 },
-          disableFlip: true,
-          formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13],
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-          }
-        };
+        const cameras = await Html5Qrcode.getCameras();
+        if (!cameras || cameras.length === 0) throw new Error('Keine Kamera gefunden');
+
+        // Rückkamera suchen, fallback auf erste Kamera
+        const backCamera = cameras.find(cam => cam.label.toLowerCase().includes('back')) || cameras[0];
 
         if (qrCodeScanner) {
           await qrCodeScanner.stop().catch(() => {});
@@ -177,8 +156,14 @@
         qrCodeScanner = new Html5Qrcode("reader");
 
         await qrCodeScanner.start(
-          { facingMode: { exact: 'environment' } },
-          config,
+          { deviceId: { exact: backCamera.id } },
+          {
+            fps: 30,
+            qrbox: { width: 350, height: 200 },
+            disableFlip: true,
+            formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13],
+            experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+          },
           async (barcode) => {
             await qrCodeScanner.stop();
             qrCodeScanner.clear();
@@ -192,13 +177,14 @@
               alert('Produkt nicht gefunden. Bitte manuell eingeben.');
             }
           },
-          (err) => {
-            console.warn('Scan-Fehler:', err);
+          (error) => {
+            // Scan-Fehler ignorieren oder loggen
+            // console.warn('Scan-Fehler:', error);
           }
         );
       } catch (err) {
         reader.style.display = 'none';
-        alert('Kamera-Zugriff fehlgeschlagen:\n' + err.message);
+        alert('Kamera-Zugriff fehlgeschlagen:\n' + (err.message || JSON.stringify(err) || err));
       }
     };
 
