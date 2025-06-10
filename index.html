@@ -96,7 +96,7 @@
         const cameras = await Html5Qrcode.getCameras();
         if (!cameras.length) throw new Error("Keine Kamera gefunden");
 
-        const backCamera = cameras.find(c => c.label.toLowerCase().includes('back')) || cameras[0];
+        const backCamera = cameras.find(c => !c.label.toLowerCase().includes('front')) || cameras[0];
         qrCodeScanner = new Html5Qrcode("reader");
 
         await qrCodeScanner.start(
