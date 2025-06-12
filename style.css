@@ -1,0 +1,34 @@
+body {
+  font-family: sans-serif;
+  margin: 1rem;
+  background-color: #f0f0f0;
+}
+input, button {
+  display: block;
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+.produkt {
+  border: 1px solid #ccc;
+  background: #fff;
+  padding: 0.5rem;
+  margin: 0.5rem 0;
+  border-radius: 8px;
+}
+.abgelaufen {
+  border-color: red;
+  background-color: #ffe6e6;
+}
+#reader {
+  width: 100%;
+  max-width: 400px;
+  aspect-ratio: 1;
+  margin-bottom: 1rem;
+  display: none;
+}
+.warnung {
+  color: red;
+  font-weight: bold;
+}
