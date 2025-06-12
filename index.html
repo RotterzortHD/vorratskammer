@@ -12,14 +12,17 @@
   <div id="reader"></div>
 
   <input type="text" id="name" placeholder="Produktname" />
-  <input type="text" id="menge" placeholder="Menge (z. B. 1 Packung)" />
+  <input type="text" id="menge" placeholder="Menge (z. B. 1 Packung)" />
   <input type="date" id="haltbarkeit" />
   <button onclick="hinzufuegen()">➕ Produkt hinzufügen</button>
 
   <h2>📋 Lagerbestand</h2>
   <div id="liste"></div>
 
+  <!-- Externe QR-Code-Bibliothek -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
+
+  <!-- Dein JavaScript (modular) -->
   <script type="module" src="main.js"></script>
 </body>
 </html>
