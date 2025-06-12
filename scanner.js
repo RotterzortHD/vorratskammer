@@ -1,15 +1,34 @@
-import { fetchProduktname } from './openfoodfacts.js';
+let qrCodeScanner = null;
 
-export async function startScanner() {
+async function fetchProduktname(barcode) {
+  try {
+    const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${barcode}.json`);
+    const data = await res.json();
+    if (data.status === 1) {
+      return data.product.product_name || "Unbenanntes Produkt";
+    }
+  } catch (e) {
+    console.error("Fehler beim Laden von Produktdaten:", e);
+  }
+  return null;
+}
+
+window.startScanner = async function () {
   const reader = document.getElementById('reader');
   reader.style.display = 'block';
 
   try {
     const cameras = await Html5Qrcode.getCameras();
     if (!cameras || cameras.length === 0) throw new Error('Keine Kamera gefunden');
+
     const backCamera = cameras.find(cam => cam.label.toLowerCase().includes('back')) || cameras[0];
 
-    const qrCodeScanner = new Html5Qrcode("reader");
+    if (qrCodeScanner) {
+      await qrCodeScanner.stop().catch(() => {});
+      qrCodeScanner.clear();
+    }
+
+    qrCodeScanner = new Html5Qrcode("reader");
 
     await qrCodeScanner.start(
       { deviceId: { exact: backCamera.id } },
@@ -33,10 +52,12 @@ export async function startScanner() {
           alert('Produkt nicht gefunden. Bitte manuell eingeben.');
         }
       },
-      (error) => { /* optional: log errors */ }
+      (error) => {
+        // Scanfehler ignorieren
+      }
     );
   } catch (err) {
     reader.style.display = 'none';
     alert('Kamera-Zugriff fehlgeschlagen:\n' + (err.message || JSON.stringify(err) || err));
   }
-}
+};
