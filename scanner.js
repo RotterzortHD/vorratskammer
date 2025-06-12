@@ -24,7 +24,7 @@ window.startScanner = async function () {
     const backCamera = cameras.find(cam => cam.label.toLowerCase().includes('back')) || cameras[0];
 
     if (qrCodeScanner) {
-      await qrCodeScanner.stop().catch(() => {});
+      await qrCodeScanner.stop().catch(console.error);
       qrCodeScanner.clear();
     }
 
@@ -53,11 +53,12 @@ window.startScanner = async function () {
         }
       },
       (error) => {
-        // Scanfehler ignorieren
+        console.warn('Scan-Fehler:', error);
       }
     );
   } catch (err) {
     reader.style.display = 'none';
+    console.error('Kamera-Zugriff fehlgeschlagen:', err);
     alert('Kamera-Zugriff fehlgeschlagen:\n' + (err.message || JSON.stringify(err) || err));
   }
 };
